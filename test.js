@@ -1,12 +1,14 @@
 "use strict";
 
 var p = require('./modules/utils.js').prettyPrint;
+p(uv);
 
 var db = require('./db.js')(
-  require('./storage.js')(require('./fs.js')()),
+  require('./storage.js')(require('./fs.js')("test")),
   require('./codec.js')(require('./bodec.js'))
 );
 p(db);
+
 var storage = db.storage;
 var codec = db.codec;
 var modes = codec.modes;
