@@ -61,7 +61,6 @@ return function (fs) {
       fs.fchmod(fd, 384);
       fs.rename(tempPath, path);
     }
-    catch (err) { throw err; }
     finally { fs.close(fd); }
   }
 
@@ -81,7 +80,6 @@ return function (fs) {
     }
     // Write the data and ensure the fd gets closed using finally.
     try { fs.write(fd, data); }
-    catch (err) { throw err; }
     finally { fs.close(fd); }
   }
 
