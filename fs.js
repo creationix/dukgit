@@ -22,7 +22,7 @@ fs.close(fd)                               - Close a file descriptor.
 
 */
 
-return function () {
+return function (root) {
 
   var wait = Duktape.Thread.yield;
   var resume = Duktape.Thread.resume;
@@ -42,6 +42,11 @@ return function () {
     close: close,
   };
 
+  function resolve(path) {
+    if (!root) { return path; }
+    // TODO: join with root
+  }
+
   function makeCallback() {
     var thread = current();
     return function (value, err) {
@@ -51,12 +56,12 @@ return function () {
   }
 
   function open(path, flags, mode) {
-    uv.fs_open(path, flags || "r", mode || 438, makeCallback());
+    uv.fs_open(resolve(path), flags || "r", mode || 438, makeCallback());
     return wait();
   }
 
   function mkdir(path, mode) {
-    uv.fs_mkdir(path, mode || 511, makeCallback());
+    uv.fs_mkdir(resolve(path), mode || 511, makeCallback());
     return wait();
   }
 
@@ -81,22 +86,22 @@ return function () {
   }
 
   function rename(path, newPath) {
-    uv.fs_rename(path, newPath, makeCallback());
+    uv.fs_rename(resolve(path), resolve(newPath), makeCallback());
     return wait();
   }
 
   function unlink(path) {
-    uv.fs_unlink(path, makeCallback());
+    uv.fs_unlink(resolve(path), makeCallback());
     return wait();
   }
 
   function rmdir(path) {
-    uv.fs_rmdir(path, makeCallback());
+    uv.fs_rmdir(resolve(path), makeCallback());
     return wait();
   }
 
   function scandir(path) {
-    uv.fs_scandir(path, makeCallback());
+    uv.fs_scandir(resolve(path), makeCallback());
     var req = wait();
     return function () {
       return uv.fs_scandir_next(req);
