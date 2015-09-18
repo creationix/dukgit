@@ -1,4 +1,5 @@
 "use strict";
+var p = require('./modules/utils.js').prettyPrint;
 
 /*
 Low Level Storage Commands
@@ -20,6 +21,7 @@ return function (fs) {
 
   return {
     fs: fs,
+    mkdirp: mkdirp,
     write: write,
     put: put,
     read: read,
@@ -75,7 +77,12 @@ return function (fs) {
     }
     // Write the data and ensure the fd gets closed using finally.
     try { fs.write(fd, data); }
-    finally { fs.close(fd); }
+    catch (err) {
+      fs.close(fd);
+      fs.unlink(path);
+      throw err;
+    }
+    fs.close(fd);
   }
 
   function read(path) {

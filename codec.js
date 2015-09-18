@@ -217,6 +217,9 @@ return function (bodec) {
   }
 
   function encodeBlob(body) {
+    if (typeof body === "string") {
+      body = bodec.fromUnicode(body);
+    }
     if (!bodec.isBinary(body)) {
       throw new TypeError("Blobs must be binary values");
     }
@@ -296,9 +299,7 @@ return function (bodec) {
     return seconds + " " + offset;
   }
 
-  function frame(obj) {
-    var type = obj.type;
-    var body = obj.body;
+  function frame(type, body) {
     if (!bodec.isBinary(body)) { body = encoders[type](body); }
     return bodec.join([
       bodec.fromRaw(type + " " + body.length + "\0"),

@@ -1,4 +1,5 @@
 "use strict";
+var p = require('./modules/utils.js').prettyPrint;
 /*
 
 Git Object Database
@@ -22,6 +23,19 @@ db.leaves(prefix) -> iter              - iterate over leaf refs
 */
 
 return function (storage, codec) {
+
+  var encoders = codec.encoders;
+  var bodec = codec.bodec;
+
+  var numToType = {
+    "1": "commit",
+    "2": "tree",
+    "3": "blob",
+    "4": "tag",
+    "6": "ofs-delta",
+    "7": "ref-delta",
+  };
+
   return {
     storage: storage,
     codec: codec,
@@ -38,6 +52,10 @@ return function (storage, codec) {
     nodes: nodes,
     leaves: leaves,
   };
+
+  function hashPath(hash) {
+    return "objects/" + hash.substring(0,2) + "/" + hash.substring(2);
+  }
 
   function has(hash) {
 
@@ -56,11 +74,15 @@ return function (storage, codec) {
   }
 
   function save(raw) {
-
+    var hash = codec.sha1(raw);
+    // 0x1000 = TDEFL_WRITE_ZLIB_HEADER
+    // 4095 = Huffman+LZ (slowest/best compression)
+    storage.put(hashPath(hash), uv.deflate(raw, 0x1000 + 4095));
+    return hash;
   }
 
-  function saveAs(kind, hash) {
-
+  function saveAs(kind, value) {
+    return save(codec.frame(kind, value));
   }
 
   function hashes() {
@@ -88,19 +110,7 @@ return function (storage, codec) {
   }
 
 };
-// local core = require('./core')
-// local miniz = require('miniz')
-// local openssl = require('openssl')
-// local uv = require('uv')
 //
-// local numToType = {
-//   [1] = "commit",
-//   [2] = "tree",
-//   [3] = "blob",
-//   [4] = "tag",
-//   [6] = "ofs-delta",
-//   [7] = "ref-delta",
-// }
 //
 // local encoders = core.encoders
 // local decoders = core.decoders
@@ -230,9 +240,6 @@ return function (storage, codec) {
 //   assert(hash and #hash == 40 and match(hash, "^%x+$"), "Invalid hash")
 // end
 //
-// local function hashPath(hash)
-//   return format("objects/%s/%s", sub(hash, 1, 2), sub(hash, 3))
-// end
 //
 // return function (storage)
 //
@@ -479,12 +486,6 @@ return function (storage, codec) {
 //     return hash
 //   end
 //
-//   function db.saveAs(kind, value)
-//     if type(value) ~= "string" then
-//       value = encoders[kind](value)
-//     end
-//     return db.save(frame(kind, value))
-//   end
 //
 //   function db.hashes()
 //     local groups = storage.nodes("objects")

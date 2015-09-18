@@ -4,7 +4,7 @@ var p = require('./modules/utils.js').prettyPrint;
 p(uv);
 
 var db = require('./db.js')(
-  require('./storage.js')(require('./fs.js')("test")),
+  require('./storage.js')(require('./fs.js')("test.git")),
   require('./codec.js')(require('./bodec.js'))
 );
 p(db);
@@ -14,28 +14,29 @@ var codec = db.codec;
 var modes = codec.modes;
 
 Duktape.Thread.resume(new Duktape.Thread(function () {
-  storage.write("test/path/file", "Hello World\n");
-  storage.put("test/file2", "Good\n");
-  storage.put("test/file2", "Bad");
-  p(storage.read("test/file2").toString());
-  var it, entry;
-  print("nodes");
-  it = storage.nodes("test");
-  while ((entry = it())) { p(entry); }
-  print("leaves");
-  it = storage.leaves("test");
-  while ((entry = it())) { p(entry); }
-  storage.remove("test/path/file");
-  storage.remove("test/file2");
+  // storage.write("test/path/file", "Hello World\n");
+  // storage.put("test/file2", "Good\n");
+  // storage.put("test/file2", "Bad");
+  // p(storage.read("test/file2").toString());
+  // var it, entry;
+  // print("nodes");
+  // it = storage.nodes("test");
+  // while ((entry = it())) { p(entry); }
+  // print("leaves");
+  // it = storage.leaves("test");
+  // while ((entry = it())) { p(entry); }
+  // storage.remove("test/path/file");
+  // storage.remove("test/file2");
+  //
+  storage.put("config",
+  "[core]\n" +
+  	"\trepositoryformatversion = 0\n" +
+  	"\tfilemode = true\n" +
+  	"\tbare = true\n");
+  storage.put("HEAD", "ref: refs/heads/master\n");
+  storage.mkdirp("refs");
 
-  var data = codec.frame({
-    type: "tree",
-    body: [
-      { name: "index.html", mode: modes.blob, hash: "80b38a9171a9c61ac590e3867f56322027240e7e" },
-    ]
-  });
-  p(data);
-  p(codec.deframe(data, true));
-
-  p(codec.sha1(""));
+  p(db.saveAs("tree", [
+    { name: "README", mode: modes.blob, hash: db.saveAs("blob", "Hello World\n") },
+  ]));
 }));

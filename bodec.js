@@ -1,5 +1,4 @@
 "use strict";
-var p = require('./modules/utils.js').prettyPrint;
 /*jshint bitwise:false,nonstandard:true*/
 
 var Buffer = Duktape.Buffer;
@@ -152,7 +151,6 @@ function fromUnicode(unicode, binary, offset) {
 }
 
 function decodeHex(hex) {
-  p("decodeHex", hex);
   var j = 0, l = hex.length;
   var raw = "";
   while (j < l) {
