@@ -59,9 +59,9 @@ return function (fs) {
     try {
       fs.write(fd, data);
       fs.fchmod(fd, 384);
-      fs.rename(tempPath, path);
     }
     finally { fs.close(fd); }
+    fs.rename(tempPath, path);
   }
 
   // Write immutable data with an exclusive open.
