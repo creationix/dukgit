@@ -1,5 +1,4 @@
 "use strict";
-var p = require('./modules/utils.js').prettyPrint;
 /*globals -open,-close*/
 /*
 Blocking/Throwing (coroutine) FS
