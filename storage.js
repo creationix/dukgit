@@ -55,11 +55,8 @@ return function (fs) {
     mkdirp(dirname(path));
     // Write the data to disk using try..finally to ensure the fd doesn't leak
     // in case of errors.
-    var fd = fs.open(tempPath, "w");
-    try {
-      fs.write(fd, data);
-      fs.fchmod(fd, 384);
-    }
+    var fd = fs.open(tempPath, "w", 384);
+    try { fs.write(fd, data); }
     finally { fs.close(fd); }
     // Rename the temp file on top of the old file for atomic commit.
     fs.rename(tempPath, path);
