@@ -53,14 +53,15 @@ return function (fs) {
     var tempPath = path + "~";
     // Ensure the parent directory exists first.
     mkdirp(dirname(path));
-    // Try to open the file in write mode.
+    // Write the data to disk using try..finally to ensure the fd doesn't leak
+    // in case of errors.
     var fd = fs.open(tempPath, "w");
-    // Ensure the fd is closed in case of error
     try {
       fs.write(fd, data);
       fs.fchmod(fd, 384);
     }
     finally { fs.close(fd); }
+    // Rename the temp file on top of the old file for atomic commit.
     fs.rename(tempPath, path);
   }
 
@@ -70,9 +71,7 @@ return function (fs) {
     mkdirp(dirname(path));
     // Try to open the file in exclusive write mode.
     var fd;
-    try {
-      fd = fs.open(path, "wx");
-    }
+    try { fd = fs.open(path, "wx"); }
     catch (err) {
       // If the file already exists, bail out, it's immutable.
       if (/^EEXIST:/.test(err.message)) { return; }
