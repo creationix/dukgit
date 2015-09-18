@@ -50,11 +50,10 @@ return function (fs) {
 
   // Perform an atomic write (with temp file and rename) for mutable data
   function write(path, data) {
-    var tempPath = path + "~";
     // Ensure the parent directory exists first.
     mkdirp(dirname(path));
-    // Write the data to disk using try..finally to ensure the fd doesn't leak
-    // in case of errors.
+    // Write the data out to a temporary file.
+    var tempPath = path + "~";
     var fd = fs.open(tempPath, "w", 384);
     try { fs.write(fd, data); }
     finally { fs.close(fd); }
