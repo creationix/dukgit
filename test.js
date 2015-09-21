@@ -3,10 +3,15 @@
 var p = require('./modules/utils.js').prettyPrint;
 p(uv);
 
-var db = require('./db.js')(
-  require('./storage.js')(require('./fs.js')("test.git")),
-  require('./codec.js')(require('./bodec.js'))
-);
+var codec = require('./codec.js')(require('./bodec.js'));
+var makeDb = require('./db.js');
+var makeStorage =require('./storage.js');
+var makeFs = require('./fs.js');
+function mount(path) {
+  return makeDb(makeStorage(makeFs(path)), codec);
+}
+var db = mount("test.git");
+
 p(db);
 
 var storage = db.storage;
@@ -28,12 +33,7 @@ Duktape.Thread.resume(new Duktape.Thread(function () {
   storage.remove("test/path/file");
   storage.remove("test/file2");
 
-  storage.put("config",
-  "[core]\n" +
-  	"\trepositoryformatversion = 0\n" +
-  	"\tfilemode = true\n" +
-  	"\tbare = true\n");
-  db.updateHead("refs/heads/master");
+  db.init();
 
   var tim = {
     name: "Tim Caswell",
@@ -54,4 +54,7 @@ Duktape.Thread.resume(new Duktape.Thread(function () {
     author: tim,
     message: "Test commit\n",
   }));
+
+  db = mount(".git");
+  p(db.loadAs("commit", "HEAD"));
 }));
