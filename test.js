@@ -14,29 +14,44 @@ var codec = db.codec;
 var modes = codec.modes;
 
 Duktape.Thread.resume(new Duktape.Thread(function () {
-  // storage.write("test/path/file", "Hello World\n");
-  // storage.put("test/file2", "Good\n");
-  // storage.put("test/file2", "Bad");
-  // p(storage.read("test/file2").toString());
-  // var it, entry;
-  // print("nodes");
-  // it = storage.nodes("test");
-  // while ((entry = it())) { p(entry); }
-  // print("leaves");
-  // it = storage.leaves("test");
-  // while ((entry = it())) { p(entry); }
-  // storage.remove("test/path/file");
-  // storage.remove("test/file2");
-  //
+  storage.write("test/path/file", "Hello World\n");
+  storage.put("test/file2", "Good\n");
+  storage.put("test/file2", "Bad");
+  p(storage.read("test/file2").toString());
+  var it, entry;
+  print("nodes");
+  it = storage.nodes("test");
+  while ((entry = it())) { p(entry); }
+  print("leaves");
+  it = storage.leaves("test");
+  while ((entry = it())) { p(entry); }
+  storage.remove("test/path/file");
+  storage.remove("test/file2");
+
   storage.put("config",
   "[core]\n" +
   	"\trepositoryformatversion = 0\n" +
   	"\tfilemode = true\n" +
   	"\tbare = true\n");
-  storage.put("HEAD", "ref: refs/heads/master\n");
-  storage.mkdirp("refs");
+  db.updateHead("refs/heads/master");
 
-  p(db.saveAs("tree", [
-    { name: "README", mode: modes.blob, hash: db.saveAs("blob", "Hello World\n") },
-  ]));
+  var tim = {
+    name: "Tim Caswell",
+    email: "tim@creationix.com",
+    date: { // Fri Sep 18 22:52:35 2015 -0500
+      seconds: 1442634755,
+      offset: 300, // CDT
+    }
+  };
+  db.setRef("refs/heads/master", db.saveAs("commit", {
+    parents: [],
+    tree: db.saveAs("tree", [
+      { name: "README",
+        mode: modes.blob,
+        hash: db.saveAs("blob", "Hello World\n") },
+    ]),
+    committer: tim,
+    author: tim,
+    message: "Test commit\n",
+  }));
 }));

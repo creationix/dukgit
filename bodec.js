@@ -1,5 +1,4 @@
 "use strict";
-/*jshint bitwise:false,nonstandard:true*/
 
 var Buffer = Duktape.Buffer;
 // This file must be served with UTF-8 encoding for the utf8 codec to work.
@@ -246,7 +245,7 @@ var toStringCoders = {
 };
 
 function toString(binary, encoding) {
-  return ((encoding && toStringCoders[encoding]) || toStringCoders.utf8)(binary);
+  return toStringCoders[encoding || "utf8"](binary);
 }
 
 var fromStringCoders = {
@@ -257,5 +256,5 @@ var fromStringCoders = {
 };
 
 function fromString(string, encoding) {
-  return ((encoding && fromStringCoders[encoding]) || fromStringCoders.utf8)(string);
+  return fromStringCoders[encoding || 'utf8'](string);
 }

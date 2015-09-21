@@ -5,14 +5,14 @@
     "maxerr"        : 50,       // {int} Maximum error before stopping
 
     // Enforcing
-    "bitwise"       : true,     // true: Prohibit bitwise operators (&, |, ^, etc.)
+    "bitwise"       : false,     // true: Prohibit bitwise operators (&, |, ^, etc.)
     "camelcase"     : false,    // true: Identifiers must be in camelCase
     "curly"         : true,     // true: Require {} for every new block or scope
     "eqeqeq"        : true,     // true: Require triple equals (===) for comparison
     "forin"         : true,     // true: Require filtering for..in loops with obj.hasOwnProperty()
     "freeze"        : true,     // true: prohibits overwriting prototypes of native objects such as Array, Date etc.
     "immed"         : false,    // true: Require immediate invocations to be wrapped in parens e.g. `(function () { } ());`
-    "indent"        : 4,        // {int} Number of spaces to use for indentation
+    "indent"        : 2,        // {int} Number of spaces to use for indentation
     "latedef"       : false,    // true: Require variables/functions to be defined before being used
     "newcap"        : false,    // true: Require capitalization of all constructor functions e.g. `new F()`
     "noarg"         : true,     // true: Prohibit use of `arguments.caller` and `arguments.callee`
@@ -35,7 +35,7 @@
     "maxdepth"      : false,    // {int} Max depth of nested blocks (within functions)
     "maxstatements" : false,    // {int} Max number statements per function
     "maxcomplexity" : false,    // {int} Max cyclomatic complexity per function
-    "maxlen"        : false,    // {int} Max number of characters per line
+    "maxlen"        : 80,       // {int} Max number of characters per line
     "varstmt"       : false,    // true: Disallow any var statements. Only `let` and `const` are allowed.
 
     // Relaxing
@@ -77,7 +77,7 @@
     "mocha"         : true,     // Mocha
     "mootools"      : false,    // MooTools
     "node"          : false,    // Node.js
-    "nonstandard"   : false,    // Widely adopted globals (escape, unescape, etc)
+    "nonstandard"   : true,     // Widely adopted globals (escape, unescape, etc)
     "phantom"       : false,    // PhantomJS
     "prototypejs"   : false,    // Prototype and Scriptaculous
     "qunit"         : false,    // QUnit

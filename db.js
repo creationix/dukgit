@@ -7,34 +7,33 @@ Git Object Database
 
 Consumes a storage interface and return a git database interface
 
-db.has(hash) -> bool                   - check if db has an object
-db.load(hash) -> raw                   - load raw data, nil if not found
-db.loadAny(hash) -> kind, value        - pre-decode data, error if not found
-db.loadAs(kind, hash) -> value         - pre-decode and check type or error
-db.save(raw) -> hash                   - save pre-encoded and framed data
-db.saveAs(kind, value) -> hash         - encode, frame and save to objects/$ha/$sh
-db.hashes() -> iter                    - Iterate over all hashes
+db.has(hash) -> bool              - check if db has an object
+db.load(hash) -> raw              - load raw data, nil if not found
+db.loadAny(hash) -> kind, value   - pre-decode data, error if not found
+db.loadAs(kind, hash) -> value    - pre-decode and check type or error
+db.save(raw) -> hash              - save pre-encoded and framed data
+db.saveAs(kind, value) -> hash    - encode, frame and save to objects/$ha/$sh
+db.hashes() -> iter               - Iterate over all hashes
 
-db.getHead() -> hash                   - Read the hash via HEAD
-db.getRef(ref) -> hash                 - Read hash of a ref
-db.resolve(ref) -> hash                - Given a hash, tag, branch, or HEAD, return the hash
-db.nodes(prefix) -> iter               - iterate over non-leaf refs
-db.leaves(prefix) -> iter              - iterate over leaf refs
+db.getHead() -> hash              - Read the hash via HEAD.
+db.updateHead(ref)                - Move head to a given ref.
+db.getRef(ref) -> hash            - Read hash of a ref.
+db.setRef(ref, hash)              - Write hash to ref.
+db.resolve(ref) -> hash           - Resolve hash, tag, branch, or HEAD to hash.
+db.nodes(prefix) -> iter          - iterate over non-leaf refs
+db.leaves(prefix) -> iter         - iterate over leaf refs
 */
 
 return function (storage, codec) {
 
-  var encoders = codec.encoders;
-  var bodec = codec.bodec;
-
-  var numToType = {
-    "1": "commit",
-    "2": "tree",
-    "3": "blob",
-    "4": "tag",
-    "6": "ofs-delta",
-    "7": "ref-delta",
-  };
+  // var numToType = {
+  //   "1": "commit",
+  //   "2": "tree",
+  //   "3": "blob",
+  //   "4": "tag",
+  //   "6": "ofs-delta",
+  //   "7": "ref-delta",
+  // };
 
   return {
     storage: storage,
@@ -47,7 +46,9 @@ return function (storage, codec) {
     saveAs: saveAs,
     hashes: hashes,
     gethead: getHead,
+    updateHead: updateHead,
     getRef: getRef,
+    setRef: setRef,
     resolve: resolve,
     nodes: nodes,
     leaves: leaves,
@@ -93,8 +94,16 @@ return function (storage, codec) {
 
   }
 
+  function updateHead(ref) {
+    return storage.write("HEAD", "ref: " + ref + "\n");
+  }
+
   function getRef(ref) {
 
+  }
+
+  function setRef(ref, hash) {
+    return storage.write(ref, hash + "\n");
   }
 
   function resolve(ref) {
@@ -111,105 +120,11 @@ return function (storage, codec) {
 
 };
 //
-//
-// local encoders = core.encoders
-// local decoders = core.decoders
-// local frame = core.frame
-// local deframe = core.deframe
-// local binToHex = core.binToHex
-// local hexToBin = core.hexToBin
-// local deflate = miniz.deflate
-// local inflate = miniz.inflate
-// local digest = openssl.digest.digest
-//
-// local band = bit.band
-// local bor = bit.bor
-// local lshift = bit.lshift
-// local rshift = bit.rshift
-// local byte = string.byte
-// local sub = string.sub
-// local match = string.format
-// local format = string.format
-// local concat = table.concat
-//
 // local quotepattern = '(['..("%^$().[]*+-?"):gsub("(.)", "%%%1")..'])'
 // local function escape(str)
 //     return str:gsub(quotepattern, "%%%1")
 // end
 //
-// local function applyDelta(base, delta) //> raw
-//   local deltaOffset = 0;
-//
-//   // Read a variable length number our of delta and move the offset.
-//   local function readLength()
-//     deltaOffset = deltaOffset + 1
-//     local b = byte(delta, deltaOffset)
-//     local length = band(b, 0x7f)
-//     local shift = 7
-//     while band(b, 0x80) > 0 do
-//       deltaOffset = deltaOffset + 1
-//       b = byte(delta, deltaOffset)
-//       length = bor(length, lshift(band(b, 0x7f), shift))
-//       shift = shift + 7
-//     end
-//     return length
-//   end
-//
-//   assert(#base == readLength(), "base length mismatch")
-//
-//   local outLength = readLength()
-//   local parts = {}
-//   while deltaOffset < #delta do
-//     deltaOffset = deltaOffset + 1
-//     local b = byte(delta, deltaOffset)
-//
-//     if band(b, 0x80) > 0 then
-//       // Copy command. Tells us offset in base and length to copy.
-//       local offset = 0
-//       local length = 0
-//       if band(b, 0x01) > 0 then
-//         deltaOffset = deltaOffset + 1
-//         offset = bor(offset, byte(delta, deltaOffset))
-//       end
-//       if band(b, 0x02) > 0 then
-//         deltaOffset = deltaOffset + 1
-//         offset = bor(offset, lshift(byte(delta, deltaOffset), 8))
-//       end
-//       if band(b, 0x04) > 0 then
-//         deltaOffset = deltaOffset + 1
-//         offset = bor(offset, lshift(byte(delta, deltaOffset), 16))
-//       end
-//       if band(b, 0x08) > 0 then
-//         deltaOffset = deltaOffset + 1
-//         offset = bor(offset, lshift(byte(delta, deltaOffset), 24))
-//       end
-//       if band(b, 0x10) > 0 then
-//         deltaOffset = deltaOffset + 1
-//         length = bor(length, byte(delta, deltaOffset))
-//       end
-//       if band(b, 0x20) > 0 then
-//         deltaOffset = deltaOffset + 1
-//         length = bor(length, lshift(byte(delta, deltaOffset), 8))
-//       end
-//       if band(b, 0x40) > 0 then
-//         deltaOffset = deltaOffset + 1
-//         length = bor(length, lshift(byte(delta, deltaOffset), 16))
-//       end
-//       if length == 0 then length = 0x10000 end
-//       // copy the data
-//       parts[#parts + 1] = sub(base, offset + 1, offset + length)
-//     elseif b > 0 then
-//       // Insert command, opcode byte is length itself
-//       parts[#parts + 1] = sub(delta, deltaOffset + 1, deltaOffset + b)
-//       deltaOffset = deltaOffset + b
-//     else
-//       error("Invalid opcode in delta")
-//     end
-//   end
-//   local out = concat(parts)
-//   assert(#out == outLength, "final size mismatch in delta application")
-//   return concat(parts)
-// end
 //
 // local function readUint32(buffer, offset)
 //   offset = offset or 0
@@ -313,7 +228,8 @@ return function (storage, codec) {
 //     packFd = assert(fs.open("objects/pack/pack-" .. packHash .. ".pack"))
 //     local stat = assert(fs.fstat(packFd))
 //     packSize = stat.size
-//     assert(fs.read(packFd, 8, 0) == "PACK\0\0\0\2", "Only v2 pack files supported")
+//     assert(fs.read(packFd, 8, 0) == "PACK\0\0\0\2",
+//            "Only v2 pack files supported")
 //
 //     indexFd = assert(fs.open("objects/pack/pack-" .. packHash .. ".idx"))
 //     assert(fs.read(indexFd, 8, 0) == '\255tOc\0\0\0\2', 'Only pack index v2 supported')
