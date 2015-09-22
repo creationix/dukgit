@@ -119,23 +119,11 @@ return function (storage, codec) {
 
       var indexLength = readUint32(fs.read(indexFd, 4, 8 + 255 * 4));
 
-      p({
-        packFd: packFd,
-        packSize: packSize,
-        indexFd: indexFd,
-        indexLength: indexLength,
-      });
-
       hashOffset = 8 + 255 * 4 + 4;
       crcOffset = hashOffset + 20 * indexLength;
       var lengthOffset = crcOffset + 4 * indexLength;
       var largeOffset = lengthOffset + 4 * indexLength;
-      p({
-        hashOffset: hashOffset,
-        crcOffset: crcOffset,
-        lengthOffset: lengthOffset,
-        largeOffset: largeOffset,
-      });
+
       offsets = [];
       lengths = [];
       var sorted = [];
@@ -165,11 +153,6 @@ return function (storage, codec) {
         }
         lengths[i] = length !== undefined ? length :(packSize - offset - 20);
       }
-
-      p({
-        lengths: lengths,
-        offsets: offsets,
-      });
 
       // timer = uv.new_timer();
       // uv.unref(timer);
@@ -284,7 +267,6 @@ return function (storage, codec) {
     function load(hash) {
       var loc = loadHash(hash);
       if (!loc) { return; }
-      p(loc);
       var obj = loadRaw(loc.offset, loc.length);
       return codec.frame(obj.type, obj.body);
     }

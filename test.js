@@ -56,5 +56,10 @@ Duktape.Thread.resume(new Duktape.Thread(function () {
   }));
 
   db = mount(".git");
-  p(db.loadAs("commit", "HEAD"));
+  var queue = ["HEAD"];
+  while (queue.length) {
+    var commit = db.loadAs("commit", queue.shift());
+    p(commit);
+    queue.push.apply(queue, commit.parents);
+  }
 }));
