@@ -29,14 +29,14 @@ db.leaves(prefix) -> iter         - iterate over leaf refs
 return function (storage, codec) {
   var bodec = codec.bodec;
 
-  // var numToType = {
-  //   "1": "commit",
-  //   "2": "tree",
-  //   "3": "blob",
-  //   "4": "tag",
-  //   "6": "ofs-delta",
-  //   "7": "ref-delta",
-  // };
+  var numToType = {
+    "1": "commit",
+    "2": "tree",
+    "3": "blob",
+    "4": "tag",
+    "6": "ofs-delta",
+    "7": "ref-delta",
+  };
 
   var packs = {};
 
@@ -70,16 +70,20 @@ return function (storage, codec) {
 
   function readUint32(buffer, offset) {
     offset = offset || 0;
-    if (buffer.length < offset + 4) { throw new Error("not enough buffer"); }
-    return ((buffer[offset] << 24) ||
-             (buffer[offset + 1] << 16) ||
-            (buffer[offset + 2] << 8) ||
-             buffer[offset + 3]);
+    if (offset + 4 > buffer.length) {
+      throw new Error("Not enough buffer");
+    }
+    return ((buffer[offset] << 24) |
+            (buffer[offset + 1] << 16) |
+            (buffer[offset + 2] << 8) |
+             buffer[offset + 3]) >>> 0;
   }
 
   function readUint64(buffer, offset) {
     offset = offset || 0;
-    if (buffer.length < offset + 8) { throw new Error("not enough buffer"); }
+    if (offset + 8 > buffer.length) {
+      throw new Error("Not enough buffer");
+    }
     return readUint32(buffer, offset) * 0x100000000 +
            readUint32(buffer, offset + 4);
   }
@@ -95,19 +99,22 @@ return function (storage, codec) {
     }
     var waiting = packs[packHash] = [];
     var packFd, indexFd;
+    var hashOffset, crcOffset;
+    var offsets, lengths;
+    // var timer;
     var fs = storage.fs;
     try {
 
       packFd = fs.open("objects/pack/pack-" + packHash + ".pack");
       var stat = fs.fstat(packFd);
-      if (fs.read(packFd, 8, 0) !== "PACK\0\0\0\2") {
-        return close(new Error("Only v2 pack files supported"));
+      if (bodec.toRaw(fs.read(packFd, 8, 0)) !== "PACK\0\0\0\2") {
+        throw new Error("Only v2 pack files supported");
       }
       var packSize = stat.size;
 
       indexFd = fs.open("objects/pack/pack-" + packHash + ".idx");
-      if (fs.read(indexFd, 8, 0) !== "\255tOc\0\0\0\2") {
-        return close(new Error("Only pack index v2 supported"));
+      if (bodec.toRaw(fs.read(indexFd, 8, 0)) !== "ÿtOc\0\0\0\2") {
+        throw new Error("Only pack index v2 supported");
       }
 
       var indexLength = readUint32(fs.read(indexFd, 4, 8 + 255 * 4));
@@ -119,183 +126,168 @@ return function (storage, codec) {
         indexLength: indexLength,
       });
 
-      close();
+      hashOffset = 8 + 255 * 4 + 4;
+      crcOffset = hashOffset + 20 * indexLength;
+      var lengthOffset = crcOffset + 4 * indexLength;
+      var largeOffset = lengthOffset + 4 * indexLength;
+      p({
+        hashOffset: hashOffset,
+        crcOffset: crcOffset,
+        lengthOffset: lengthOffset,
+        largeOffset: largeOffset,
+      });
+      offsets = [];
+      lengths = [];
+      var sorted = [];
+      var data = fs.read(indexFd, 4 * indexLength, lengthOffset);
+      var i, offset;
+      for (i = 0; i < indexLength; i++) {
+        offset = readUint32(data, i * 4 );
+        if ((offset & 0x80000000) > 0) {
+          // throw new Error("TODO: Implement large offsets properly");
+          offset = largeOffset + (offset & 0x7fffffff) * 8;
+          offset = readUint64(fs.read(indexFd, 8, offset));
+        }
+        offsets[i] = offset;
+        sorted[i] = offset;
+      }
+      sorted.sort(function (a, b) {
+        return a < b ? -1 : a > b ? 1 : 0;
+      });
+      for (i = 0; i < indexLength; i++) {
+        offset = offsets[i];
+        var length;
+        for (var j = 0; j < indexLength - 1; j++) {
+          if (sorted[j] === offset) {
+            length = sorted[j + 1] - offset;
+            break;
+          }
+        }
+        lengths[i] = length !== undefined ? length :(packSize - offset - 20);
+      }
+
+      p({
+        lengths: lengths,
+        offsets: offsets,
+      });
+
+      // timer = uv.new_timer();
+      // uv.unref(timer);
+      // uv.timer_start(timer, 2000, 2000, timeout);
+
     }
     catch (err) {
       close(err);
     }
 
+    pack = packs[packHash] = {
+      load: load
+    };
+    waiting.forEach(function (thread) {
+      Duktape.Thread.resume(thread);
+    });
+    waiting = undefined;
+
+    return pack;
+
     function close(err) {
       if (packFd) { fs.close(packFd); }
       if (indexFd) { fs.close(indexFd); }
-      if (err) { throw err; }
+      // if (timer) { uv.close(timer); }
+      if (err) {
+        if (waiting) {
+          waiting.forEach(function (thread) {
+            Duktape.Thread.resume(thread, err, true);
+          });
+        }
+        throw err;
+      }
     }
-    //
-    //     local function close()
-    //       if pack then
-    //         pack.waiting = nil
-    //         if packs[packHash] == pack then
-    //           packs[packHash] = nil
-    //         end
-    //         pack = nil
-    //       end
-    //       if timer then
-    //         timer:stop()
-    //         timer:close()
-    //         timer = nil
-    //       end
-    //       if indexFd then
-    //         fs.close(indexFd)
-    //         indexFd = nil
-    //       end
-    //       if packFd then
-    //         fs.close(packFd)
-    //         packFd = nil
-    //       end
-    //     end
-    //
-    //     local function timeout()
-    //       coroutine.wrap(close)()
-    //     end
-    //
-    //
-    //     timer = uv.new_timer()
-    //     uv.unref(timer)
-    //     timer:start(2000, 2000, timeout)
-    //
-    //     packFd = assert(fs.open("objects/pack/pack-" .. packHash .. ".pack"))
-    //     local stat = assert(fs.fstat(packFd))
-    //     packSize = stat.size
-    //     assert(fs.read(packFd, 8, 0) == "PACK\0\0\0\2",
-    //            "Only v2 pack files supported")
-    //
-    //     indexFd = assert(fs.open("objects/pack/pack-" .. packHash .. ".idx"))
-    //     assert(fs.read(indexFd, 8, 0) == '\255tOc\0\0\0\2', 'Only pack index v2 supported')
-    //     indexLength = readUint32(assert(fs.read(indexFd, 4, 8 + 255 * 4)))
-    //     hashOffset = 8 + 255 * 4 + 4
-    //     crcOffset = hashOffset + 20 * indexLength
-    //     local lengthOffset = crcOffset + 4 * indexLength
-    //     local largeOffset = lengthOffset + 4 * indexLength
-    //     offsets = {}
-    //     lengths = {}
-    //     local sorted = {}
-    //     local data = assert(fs.read(indexFd, 4 * indexLength, lengthOffset))
-    //     for i = 1, indexLength do
-    //       local offset = readUint32(data, (i - 1) * 4)
-    //       if band(offset, 0x80000000) > 0 then
-    //         error("TODO: Implement large offsets properly")
-    //         offset = largeOffset + band(offset, 0x7fffffff) * 8;
-    //         offset = readUint64(assert(fs.read(indexFd, 8, offset)))
-    //       end
-    //       offsets[i] = offset
-    //       sorted[i] = offset
-    //     end
-    //     table.sort(sorted)
-    //     for i = 1, indexLength do
-    //       local offset = offsets[i]
-    //       local length
-    //       for j = 1, indexLength - 1 do
-    //         if sorted[j] == offset then
-    //           length = sorted[j + 1] - offset
-    //           break
-    //         end
-    //       end
-    //       lengths[i] = length or (packSize - offset - 20)
-    //     end
-    //
-    //     local function loadHash(hash) //> offset
-    //
-    //       // Read first fan-out table to get index into offset table
-    //       local prefix = hexToBin(hash:sub(1, 2)):byte(1)
-    //       local first = prefix == 0 and 0 or readUint32(assert(fs.read(indexFd, 4, 8 + (prefix - 1) * 4)))
-    //       local last = readUint32(assert(fs.read(indexFd, 4, 8 + prefix * 4)))
-    //
-    //       for index = first, last do
-    //         local start = hashOffset + index * 20
-    //         local foundHash = binToHex(assert(fs.read(indexFd, 20, start)))
-    //         if foundHash == hash then
-    //           index = index + 1
-    //           return offsets[index], lengths[index]
-    //         end
-    //       end
-    //     end
-    //
-    //     local function loadRaw(offset, length) //>raw
-    //       // Shouldn't need more than 32 bytes to read variable length header and
-    //       // optional hash or offset
-    //       local chunk = assert(fs.read(packFd, 32, offset))
-    //       local b = byte(chunk, 1)
-    //
-    //       // Parse out the git type
-    //       local kind = numToType[band(rshift(b, 4), 0x7)]
-    //
-    //       // Parse out the uncompressed length
-    //       local size = band(b, 0xf)
-    //       local left = 4
-    //       local i = 2
-    //       while band(b, 0x80) > 0 do
-    //         b = byte(chunk, i)
-    //         i = i + 1
-    //         size = bor(size, lshift(band(b, 0x7f), left))
-    //         left = left + 7
-    //       end
-    //
-    //       // Optionally parse out the hash or offset for deltas
-    //       local ref
-    //       if kind == "ref-delta" then
-    //         ref = binToHex(chunk:sub(i + 1, i + 20))
-    //         i = i + 20
-    //       elseif kind == "ofs-delta" then
-    //         b = byte(chunk, i)
-    //         i = i + 1
-    //         ref = band(b, 0x7f)
-    //         while band(b, 0x80) > 0 do
-    //           b = byte(chunk, i)
-    //           i = i + 1
-    //           ref = bor(lshift(ref + 1, 7), band(b, 0x7f))
-    //         end
-    //       end
-    //
-    //       local compressed = assert(fs.read(packFd, length, offset + i - 1))
-    //       local raw = inflate(compressed, 1)
-    //
-    //       assert(#raw == size, "inflate error or size mismatch at offset " .. offset)
-    //
-    //       if kind == "ref-delta" then
-    //         error("TODO: handle ref-delta")
-    //       elseif kind == "ofs-delta" then
-    //         local base
-    //         kind, base = loadRaw(offset - ref)
-    //         raw = applyDelta(base, raw)
-    //       end
-    //       return kind, raw
-    //     end
-    //
-    //     function pack.load(hash) //> raw
-    //       if not pack then
-    //         return makePack(packHash).load(hash)
-    //       end
-    //       timer:again()
-    //       local success, result = pcall(function ()
-    //         local offset, length = loadHash(hash)
-    //         if not offset then return end
-    //         local kind, raw = loadRaw(offset, length)
-    //         return frame(kind, raw)
-    //       end)
-    //       if success then return result end
-    //       // close()
-    //       error(result)
-    //     end
-    //
-    //     packs[packHash] = pack
-    //     pack.waiting = nil
-    //     for i = 1, #waiting do
-    //       assert(coroutine.resume(waiting[i], pack))
-    //     end
-    //
-    //     return pack
-    //   end
 
+    // function timeout() {
+    //   return close();
+    // }
+
+    function loadHash(hash) {
+      // Read first fan-out table to get index into offset table
+      var prefix = parseInt(hash.substring(0, 2), 16);
+      var first = (prefix === 0) ? 0 :
+                  readUint32(fs.read(indexFd, 4, 8 + (prefix - 1) * 4));
+      var last = readUint32(fs.read(indexFd, 4, 8 + (prefix) * 4));
+      for (var i = first; i < last; i++) {
+        var start = hashOffset + i * 20;
+        var foundHash = bodec.toHex(fs.read(indexFd, 20, start));
+        if (foundHash === hash) {
+          return {
+            offset: offsets[i],
+            length: lengths[i],
+          };
+        }
+      }
+    }
+
+    function loadRaw(offset, length) {
+      // Shouldn't need more than 32 bytes to read variable length header and
+      // optional hash or offset
+      var chunk = fs.read(packFd, 32, offset);
+      var b = chunk[0];
+
+      // Parse out the git type
+      var kind = numToType[(b >> 4) & 0x7];
+
+      // Parse out the uncompressed length
+      var size = b & 0xf;
+      var left = 4;
+      var i = 1;
+      while (b & 0x80) {
+        b = chunk[i++];
+        size |= ((b & 0x7f) << left);
+        left += 7;
+      }
+
+      // Optionally parse out the hash or offset for deltas
+      var ref;
+      if (kind === "ref-delta") {
+        ref = bodec.toHex(chunk, i, 20);
+        i += 20;
+      }
+      else if (kind === "ofs-delta") {
+        b = chunk[i++];
+        ref = b & 0x7f;
+        while (b & 0x80) {
+          b = chunk[i++];
+          ref = ((ref + 1) << 7) | (b & 0x7f);
+        }
+      }
+
+      var compressed = fs.read(packFd, length, offset + i);
+      var raw = uv.inflate(compressed, 1);
+
+      if (raw.length !== size) {
+        throw new Error("Inflate error or size mismatch at offset " + offset);
+      }
+
+      if (kind === "ref-delta") {
+        throw new Error("TODO: handle ref-delta");
+      }
+      else if (kind === "ofs-delta") {
+        var base = loadRaw(offset - ref);
+        raw = codec.applyDelta(base.body, raw);
+        kind = base.type;
+      }
+      return {
+        type: kind,
+        body: raw
+      };
+    }
+
+    function load(hash) {
+      var loc = loadHash(hash);
+      if (!loc) { return; }
+      p(loc);
+      var obj = loadRaw(loc.offset, loc.length);
+      return codec.frame(obj.type, obj.body);
+    }
   }
 
   function init() {
