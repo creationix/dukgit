@@ -355,7 +355,6 @@ return function (storage, codec) {
     }
     value = storage.read("packed-refs");
     if (!value) { return;}
-    // TODO: escape ref as literal regular expression value.
     match = bodec.toUnicode(value).match(
       new RegExp("([0-9a-f]{40}) " + quoteRegExp(ref)));
     if (match) { return match[1]; }
@@ -368,8 +367,9 @@ return function (storage, codec) {
   function resolve(ref) {
     if (ref === "HEAD") { ref = getHead(); }
     if (/^[0-9a-f]{40}$/.test(ref)) { return ref; }
-    // TODO: also try prepending "refs/tags" and "refs/branches" to query.
-    return getRef(ref);
+    return getRef(ref) ||
+      getRef("refs/heads/" + ref) ||
+      getRef("refs/tags/" + ref);
   }
 
   function nodes(prefix) {
@@ -406,15 +406,6 @@ return function (storage, codec) {
 //     end
 //   end
 //
-//
-//   function db.resolve(ref)
-//     if ref == "HEAD" then return db.getHead() end
-//     local hash = ref:match("^%x+$")
-//     if hash and #hash == 40 then return hash end
-//     return db.getRef(ref)
-//         or db.getRef("refs/heads/" .. ref)
-//         or db.getRef("refs/tags/" .. ref)
-//   end
 //
 //   local function makePackedIter(prefix, inner)
 //     local packed = storage.read("packed-refs")
