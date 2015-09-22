@@ -19,12 +19,13 @@ return function (bodec) {
   };
 
   var modes = require('./modes.js');
+  var applyDelta = require('./apply-delta.js')(bodec);
 
   return {
     bodec: bodec,
     modes: modes,
     sha1: require('./sha1.js')(bodec),
-    applyDelta: require('./apply-delta.js')(bodec),
+    applyDelta: applyDelta,
     safe: safe,
     // ({type:type, body:raw-buffer}) -> buffer
     frame: frame,
@@ -35,6 +36,7 @@ return function (bodec) {
     encoders: encoders,
     decoders: decoders,
   };
+
 
   function treeSort(a, b) {
     var aa = (a.mode === modes.tree) ? a.name + "/" : a.name;
